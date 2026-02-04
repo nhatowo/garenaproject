@@ -2,6 +2,7 @@ from flask import Flask, request, render_template_string, session, redirect, url
 from imap_tools import MailBox, AND
 import os
 import re
+from datetime import timezone, timedelta
 
 # ================= CẤU HÌNH =================
 MY_GMAIL    = os.environ.get("MY_GMAIL")
@@ -12,31 +13,35 @@ DOMAIN      = "anhnhat07.online"
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-# ================= XỬ LÝ LỌC CODE =================
+# ================= XỬ LÝ LỌC CODE THÔNG MINH =================
 def extract_garena_code(text):
     if not text: return None
-    # Bắt chuỗi 8 số (Format mới của Garena)
+    
+    # CHIẾN THUẬT 1: Tìm code nằm ngay sau chữ "mã bên dưới" (Chuẩn 100%)
+    # Regex tìm: chữ "mã" + ký tự bất kỳ + số code
+    match_smart = re.search(r'(mã\s+bên\s+dưới|verification\s+code).*?(\d{6,8})', text, re.IGNORECASE | re.DOTALL)
+    if match_smart:
+        return match_smart.group(2) # Lấy đúng cái số tìm được
+        
+    # CHIẾN THUẬT 2: Nếu không thấy từ khóa, mới tìm số 8 chữ số (Dự phòng)
     match_8 = re.search(r'\b\d{8}\b', text)
     if match_8: return match_8.group(0)
     
-    # Bắt chuỗi 6 số (Format cũ)
+    # CHIẾN THUẬT 3: Tìm số 6 chữ số (Dự phòng format cũ)
     match_6 = re.search(r'\b\d{6}\b', text)
     if match_6: return match_6.group(0)
 
-    # Bắt code hỗn hợp
-    match_mixed = re.search(r'\b[A-Z0-9]{6,8}\b', text)
-    if match_mixed: return match_mixed.group(0)
     return None
 
-# ================= GIAO DIỆN DARK MODE PRO =================
+# ================= GIAO DIỆN DARK MODE =================
 HTML_LAYOUT = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Garena Tool V3</title>
+    <title>Garena Tool V4</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --accent: #3b82f6; --danger: #ef4444; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --accent: #3b82f6; }
         body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; padding: 10px; }
         .container { width: 100%; max-width: 500px; background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         
@@ -52,7 +57,7 @@ HTML_LAYOUT = """
         .code-val { font-size: 24px; font-weight: bold; font-family: monospace; letter-spacing: 2px; }
         .copy-btn { width: auto; padding: 5px 15px; font-size: 12px; background: #d97706; margin: 0; }
         
-        .original-content { background: white; color: black; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; overflow: auto; }
+        .original-content { background: white; color: black; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; overflow: hidden; }
         .toggle-link { text-align: right; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; display: block; }
         
         .footer { text-align: center; font-size: 12px; color: #64748b; margin-top: 20px; border-top: 1px solid #334155; padding-top: 10px; }
@@ -103,28 +108,31 @@ def inbox():
     
     try:
         with MailBox('imap.gmail.com').login(MY_GMAIL, MY_APP_PASS) as mailbox:
-            # Lấy 10 mail mới nhất gửi đến (Tăng limit lên để không bị sót)
-            msgs = [m for m in mailbox.fetch(AND(to=target_email), limit=10, reverse=True)]
+            msgs = [m for m in mailbox.fetch(AND(to=target_email), limit=5, reverse=True)]
             
             if not msgs:
-                html = f"<div style='text-align:center; padding:20px'>📭 Chưa có thư nào cho <b>{target_email}</b><br><small>(Hãy kiểm tra mục Spam trong Gmail gốc)</small></div>"
+                html = f"<div style='text-align:center; padding:20px'>📭 Chưa có thư nào cho <b>{target_email}</b></div>"
             else:
                 html = ""
                 for i, msg in enumerate(msgs):
-                    # Ưu tiên lấy HTML để hiển thị đẹp, nếu không có thì lấy Text
+                    # CHỈNH GIỜ VIỆT NAM (GMT+7)
+                    vn_time = msg.date.astimezone(timezone(timedelta(hours=7)))
+                    time_str = vn_time.strftime("%H:%M %d/%m")
+                    
                     body_view = msg.html if msg.html else msg.text
-                    # Lấy text thuần để lọc code
                     text_for_scan = msg.text if msg.text else msg.html
                     
+                    # Gọi hàm lọc thông minh
                     code = extract_garena_code(text_for_scan)
+                    
                     code_html = f"""<div class="code-box"><span class="code-val">{code}</span><button class="copy-btn" onclick="copy('{code}')">COPY</button></div>""" if code else "<div style='color:#ef4444; font-size:12px'>⚠️ Không tìm thấy code</div>"
                     
                     html += f"""
                     <div class="email-item">
-                        <div class="meta"><span>{msg.date.strftime("%H:%M %d/%m")}</span><span>GARENA</span></div>
+                        <div class="meta"><span>{time_str}</span><span>GARENA</span></div>
                         <div class="subject">{msg.subject}</div>
                         {code_html}
-                        <span class="toggle-link" onclick="toggle('body-{i}')">▼ Xem nội dung gốc (HTML)</span>
+                        <span class="toggle-link" onclick="toggle('body-{i}')">▼ Xem nội dung gốc</span>
                         <div id="body-{i}" class="original-content">{body_view}</div>
                     </div>
                     """

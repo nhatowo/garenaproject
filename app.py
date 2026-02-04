@@ -15,125 +15,65 @@ app.secret_key = SECRET_KEY
 # ================= XỬ LÝ LỌC CODE =================
 def extract_garena_code(text):
     if not text: return None
-    # Bắt code từ 6 đến 8 số (Garena mới + cũ)
-    match_digits = re.search(r'\b\d{6,8}\b', text)
-    if match_digits: return match_digits.group(0)
-    # Bắt code hỗn hợp chữ số
+    # Bắt chuỗi 8 số (Format mới của Garena)
+    match_8 = re.search(r'\b\d{8}\b', text)
+    if match_8: return match_8.group(0)
+    
+    # Bắt chuỗi 6 số (Format cũ)
+    match_6 = re.search(r'\b\d{6}\b', text)
+    if match_6: return match_6.group(0)
+
+    # Bắt code hỗn hợp
     match_mixed = re.search(r'\b[A-Z0-9]{6,8}\b', text)
     if match_mixed: return match_mixed.group(0)
     return None
 
-# ================= GIAO DIỆN DARK MODE =================
+# ================= GIAO DIỆN DARK MODE PRO =================
 HTML_LAYOUT = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Garena Tool - AnhNhat07</title>
+    <title>Garena Tool V3</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        /* CẤU HÌNH MÀU DARK MODE */
-        :root {
-            --bg-color: #0f172a;       /* Nền đen xanh đậm */
-            --card-bg: #1e293b;        /* Nền hộp chứa */
-            --text-main: #e2e8f0;      /* Chữ trắng sáng */
-            --text-sub: #94a3b8;       /* Chữ xám nhạt */
-            --accent: #3b82f6;         /* Màu xanh chủ đạo */
-            --accent-hover: #2563eb;
-            --code-bg: #334155;        /* Nền chứa mã code */
-            --code-text: #fbbf24;      /* Mã code màu vàng nổi bật */
-            --border: #334155;
-        }
-
-        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; display: flex; justify-content: center; min-height: 100vh; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --accent: #3b82f6; --danger: #ef4444; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; padding: 10px; }
+        .container { width: 100%; max-width: 500px; background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         
-        .container { 
-            width: 100%; max-width: 500px; 
-            background: var(--card-bg); 
-            padding: 25px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5); 
-            display: flex; flex-direction: column; 
-            min-height: 100vh; 
-        }
+        h2 { text-align: center; color: var(--accent); margin-top: 0; }
+        input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         
-        @media (min-width: 600px) { 
-            .container { min-height: auto; margin-top: 30px; border-radius: 16px; height: fit-content; border: 1px solid var(--border); } 
-        }
+        .email-item { background: #334155; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #475569; }
+        .meta { font-size: 12px; color: #94a3b8; display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .subject { font-weight: bold; font-size: 15px; margin-bottom: 10px; color: white; }
         
-        h2 { text-align: center; color: var(--accent); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
-        .sub-title { text-align: center; color: var(--text-sub); font-size: 13px; margin-bottom: 25px; }
-
-        input { 
-            width: 100%; padding: 15px; 
-            background: #0f172a; border: 1px solid var(--border); 
-            color: white; border-radius: 8px; box-sizing: border-box; 
-            font-size: 16px; outline: none; transition: 0.3s;
-        }
-        input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+        .code-box { background: #fffbeb; color: #d97706; padding: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .code-val { font-size: 24px; font-weight: bold; font-family: monospace; letter-spacing: 2px; }
+        .copy-btn { width: auto; padding: 5px 15px; font-size: 12px; background: #d97706; margin: 0; }
         
-        button { 
-            width: 100%; padding: 15px; margin-top: 15px;
-            background: var(--accent); color: white; 
-            border: none; border-radius: 8px; 
-            cursor: pointer; font-weight: bold; font-size: 16px; 
-            transition: 0.3s;
-        }
-        button:hover { background: var(--accent-hover); transform: translateY(-2px); }
+        .original-content { background: white; color: black; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; overflow: auto; }
+        .toggle-link { text-align: right; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; display: block; }
         
-        /* EMAIL ITEM STYLE */
-        .email-item { background: #263344; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid var(--border); }
-        .email-meta { font-size: 12px; color: var(--text-sub); display: flex; justify-content: space-between; margin-bottom: 8px; }
-        .email-subject { font-weight: bold; color: white; font-size: 15px; margin-bottom: 12px; border-bottom: 1px dashed var(--border); padding-bottom: 8px;}
-        
-        /* CODE BOX */
-        .code-box-container { display: flex; align-items: center; background: var(--code-bg); padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #475569; }
-        .code-value { font-size: 26px; font-weight: bold; color: var(--code-text); letter-spacing: 3px; flex-grow: 1; text-align: center; font-family: monospace; }
-        .copy-btn { width: auto; padding: 6px 15px; font-size: 13px; background: var(--accent); margin-left: 10px; margin-top: 0; }
-        
-        /* FOOTER INFO */
-        .footer-info { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border); text-align: center; font-size: 14px; color: var(--text-sub); }
-        .footer-info p { margin: 5px 0; }
-        .footer-info b { color: var(--accent); }
-        .contact-link { color: var(--text-main); text-decoration: none; display: block; margin: 5px 0; transition: 0.2s;}
-        .contact-link:hover { color: var(--accent); }
-
-        /* NỘI DUNG ẨN */
-        .original-body { font-size: 13px; color: #cbd5e1; background: #0f172a; padding: 10px; border-radius: 4px; margin-top: 10px; display: none; word-break: break-word; border: 1px solid var(--border); }
-        .toggle-body { font-size: 13px; color: var(--accent); cursor: pointer; text-align: right; display: block; margin-top: 5px; }
-        
-        .empty { text-align: center; color: var(--text-sub); margin-top: 40px; }
-        .refresh-btn { background: #10b981; margin-bottom: 20px; margin-top: 0; }
-        .refresh-btn:hover { background: #059669; }
-        .logout { color: #ef4444; text-decoration: none; font-size: 14px; font-weight: bold; }
+        .footer { text-align: center; font-size: 12px; color: #64748b; margin-top: 20px; border-top: 1px solid #334155; padding-top: 10px; }
+        .footer a { color: var(--accent); text-decoration: none; display: block; margin: 3px 0; }
     </style>
     <script>
-        function copyText(text) {
-            navigator.clipboard.writeText(text).then(function() {
-                alert('Đã copy mã: ' + text);
-            }, function(err) {
-                prompt("Copy thủ công:", text);
-            });
-        }
-        function toggleBody(id) {
+        function copy(text) { navigator.clipboard.writeText(text); alert('Đã copy: ' + text); }
+        function toggle(id) {
             var x = document.getElementById(id);
-            if (x.style.display === "none") {
-                x.style.display = "block";
-                document.getElementById('btn-'+id).innerText = "▲ Thu gọn";
-            } else {
-                x.style.display = "none";
-                document.getElementById('btn-'+id).innerText = "▼ Xem nội dung gốc";
-            }
+            x.style.display = (x.style.display === 'block') ? 'none' : 'block';
         }
     </script>
 </head>
 <body>
     <div class="container">
         {{ content|safe }}
-        
-        <div class="footer-info">
-            <p style="text-transform: uppercase; font-weight: bold; color: #94a3b8; font-size: 12px; margin-bottom: 10px;">Liên hệ Hỗ Trợ</p>
-            <p>Zalo: <b>0326.265.982</b></p>
-            <a href="https://t.me/AnhNhat07" target="_blank" class="contact-link">Telegram: <b>@AnhNhat07</b></a>
-            <a href="https://fb.com/MYNAMEISNHAT07" target="_blank" class="contact-link">Facebook: <b>MYNAMEISNHAT07</b></a>
+        <div class="footer">
+            <p>HỖ TRỢ KỸ THUẬT</p>
+            <p>Zalo: 0326.265.982</p>
+            <a href="https://t.me/AnhNhat07">Telegram: @AnhNhat07</a>
+            <a href="https://fb.com/MYNAMEISNHAT07">Facebook: MYNAMEISNHAT07</a>
         </div>
     </div>
 </body>
@@ -144,91 +84,60 @@ HTML_LAYOUT = """
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        user = request.form['username'].strip().lower()
-        if '@' in user: user = user.split('@')[0]
+        user = request.form['username'].strip().lower().split('@')[0]
         session['user'] = user
         return redirect(url_for('inbox'))
-        
-    form_html = """
-        <h2>Garena Tools</h2>
-        <div class="sub-title">Hệ thống lấy mã xác minh tự động siêu tốc</div>
+    return render_template_string(HTML_LAYOUT, content="""
+        <h2>GARENA MAIL</h2>
         <form method="post">
-            <input type="text" name="username" placeholder="Nhập tên tài khoản (Ví dụ: nhattaoacc01)" required>
-            <button type="submit">🔍 CHECK CODE NGAY</button>
+            <input name="username" placeholder="Nhập tên tài khoản (ví dụ: nhattaoacc01)" required>
+            <button>XEM CODE NGAY</button>
         </form>
-    """
-    return render_template_string(HTML_LAYOUT, content=form_html)
+    """)
 
 @app.route('/inbox')
 def inbox():
     if 'user' not in session: return redirect(url_for('login'))
+    user = session['user']
+    target_email = f"{user}@{DOMAIN}"
     
-    username = session['user']
-    target_email = f"{username}@{DOMAIN}"
-    
-    email_html = ""
     try:
-        if not MY_GMAIL or not MY_APP_PASS: return "Lỗi cấu hình!"
-
         with MailBox('imap.gmail.com').login(MY_GMAIL, MY_APP_PASS) as mailbox:
-            msgs = [m for m in mailbox.fetch(AND(to=target_email), limit=5, reverse=True)]
+            # Lấy 10 mail mới nhất gửi đến (Tăng limit lên để không bị sót)
+            msgs = [m for m in mailbox.fetch(AND(to=target_email), limit=10, reverse=True)]
             
             if not msgs:
-                email_html = """
-                <div class="empty">
-                    <p style="font-size: 40px; margin: 0;">📭</p>
-                    <p>Chưa có thư nào gửi đến<br><b style="color: #e2e8f0">%s</b></p>
-                </div>
-                """ % target_email
+                html = f"<div style='text-align:center; padding:20px'>📭 Chưa có thư nào cho <b>{target_email}</b><br><small>(Hãy kiểm tra mục Spam trong Gmail gốc)</small></div>"
             else:
-                for index, msg in enumerate(msgs):
-                    body_text = msg.text or msg.html or ""
-                    extracted_code = extract_garena_code(body_text)
+                html = ""
+                for i, msg in enumerate(msgs):
+                    # Ưu tiên lấy HTML để hiển thị đẹp, nếu không có thì lấy Text
+                    body_view = msg.html if msg.html else msg.text
+                    # Lấy text thuần để lọc code
+                    text_for_scan = msg.text if msg.text else msg.html
                     
-                    code_display = ""
-                    if extracted_code:
-                        code_display = f"""
-                        <div class="code-box-container">
-                            <span class="code-value">{extracted_code}</span>
-                            <button class="copy-btn" onclick="copyText('{extracted_code}')">COPY</button>
-                        </div>
-                        """
-                    else:
-                        code_display = "<div style='color:#ef4444; font-size:12px; margin-bottom:5px; font-style: italic;'>⚠️ Không tìm thấy mã trong thư này</div>"
-
-                    body_id = f"body-{index}"
-                    btn_id = f"btn-body-{index}"
+                    code = extract_garena_code(text_for_scan)
+                    code_html = f"""<div class="code-box"><span class="code-val">{code}</span><button class="copy-btn" onclick="copy('{code}')">COPY</button></div>""" if code else "<div style='color:#ef4444; font-size:12px'>⚠️ Không tìm thấy code</div>"
                     
-                    email_html += f"""
+                    html += f"""
                     <div class="email-item">
-                        <div class="email-meta">
-                            <span>{msg.date.strftime("%H:%M %d/%m")}</span>
-                            <span style="color:#3b82f6; font-weight:bold;">GARENA</span>
-                        </div>
-                        <div class="email-subject">{msg.subject}</div>
-                        
-                        {code_display}
-                        
-                        <span id="{btn_id}" class="toggle-body" onclick="toggleBody('{body_id}')">▼ Xem nội dung gốc</span>
-                        <div id="{body_id}" class="original-body">
-                            {body_text[:1000]}
-                        </div>
+                        <div class="meta"><span>{msg.date.strftime("%H:%M %d/%m")}</span><span>GARENA</span></div>
+                        <div class="subject">{msg.subject}</div>
+                        {code_html}
+                        <span class="toggle-link" onclick="toggle('body-{i}')">▼ Xem nội dung gốc (HTML)</span>
+                        <div id="body-{i}" class="original-content">{body_view}</div>
                     </div>
                     """
     except Exception as e:
-        email_html = f"<p style='color:#ef4444; text-align:center'>Lỗi kết nối: {e}</p>"
+        html = f"<div style='color:red; text-align:center'>Lỗi kết nối: {e}</div>"
 
-    content = f"""
-        <div class="email-meta" style="justify-content:center; margin-bottom:15px; border-bottom: 1px solid #334155; padding-bottom: 10px;">
-            <span style="font-size: 16px;">👤 <b>{username}</b></span> 
-            <a href="/logout" class="logout" style="margin-left: 15px;">Thoát ➔</a>
+    return render_template_string(HTML_LAYOUT, content=f"""
+        <div style="text-align:center; margin-bottom:15px">
+            👤 <b>{user}</b> | <a href="/logout" style="color:#ef4444; text-decoration:none">Thoát</a>
         </div>
-        <a href="/inbox" style="text-decoration:none">
-            <button class="refresh-btn">🔄 LÀM MỚI HỘP THƯ</button>
-        </a>
-        {email_html}
-    """
-    return render_template_string(HTML_LAYOUT, content=content)
+        <a href="/inbox" style="text-decoration:none"><button style="background:#10b981; margin-bottom:15px">🔄 LÀM MỚI</button></a>
+        {html}
+    """)
 
 @app.route('/logout')
 def logout():

@@ -1,156 +1,65 @@
-from flask import Flask, request, render_template_string, session, redirect, url_for
-from imap_tools import MailBox, AND
-import os
-import re
-from datetime import timezone, timedelta
+# Đây là code dành cho trang WEB hiển thị mail code (Flask/FastAPI)
+# Đảm bảo bạn đã cài: pip install flask imap_tools
 
-# ================= CẤU HÌNH =================
-MY_GMAIL    = os.environ.get("MY_GMAIL")
-MY_APP_PASS = os.environ.get("MY_APP_PASS")
-SECRET_KEY  = os.environ.get("SECRET_KEY", "khoa_bao_mat_mac_dinh")
-DOMAIN      = "anhnhat07.online"
+from flask import Flask, render_template_string
+from imap_tools import MailBox, AND
+import re
 
 app = Flask(__name__)
-app.secret_key = SECRET_KEY
 
-# ================= XỬ LÝ LỌC CODE THÔNG MINH =================
-def extract_garena_code(text):
-    if not text: return None
-    
-    # CHIẾN THUẬT 1: Tìm code nằm ngay sau chữ "mã bên dưới" (Chuẩn 100%)
-    # Regex tìm: chữ "mã" + ký tự bất kỳ + số code
-    match_smart = re.search(r'(mã\s+bên\s+dưới|verification\s+code).*?(\d{6,8})', text, re.IGNORECASE | re.DOTALL)
-    if match_smart:
-        return match_smart.group(2) # Lấy đúng cái số tìm được
-        
-    # CHIẾN THUẬT 2: Nếu không thấy từ khóa, mới tìm số 8 chữ số (Dự phòng)
-    match_8 = re.search(r'\b\d{8}\b', text)
-    if match_8: return match_8.group(0)
-    
-    # CHIẾN THUẬT 3: Tìm số 6 chữ số (Dự phòng format cũ)
-    match_6 = re.search(r'\b\d{6}\b', text)
-    if match_6: return match_6.group(0)
+# Cấu hình mail của Nhật
+MY_GMAIL = "anhnhatlamacc@gmail.com"
+MY_APP_PASS = "jdmx zyeb vhtr lqhn"
 
-    return None
-
-# ================= GIAO DIỆN DARK MODE =================
-HTML_LAYOUT = """
+HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Garena Tool V4</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --accent: #3b82f6; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; padding: 10px; }
-        .container { width: 100%; max-width: 500px; background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        
-        h2 { text-align: center; color: var(--accent); margin-top: 0; }
-        input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        
-        .email-item { background: #334155; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #475569; }
-        .meta { font-size: 12px; color: #94a3b8; display: flex; justify-content: space-between; margin-bottom: 10px; }
-        .subject { font-weight: bold; font-size: 15px; margin-bottom: 10px; color: white; }
-        
-        .code-box { background: #fffbeb; color: #d97706; padding: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .code-val { font-size: 24px; font-weight: bold; font-family: monospace; letter-spacing: 2px; }
-        .copy-btn { width: auto; padding: 5px 15px; font-size: 12px; background: #d97706; margin: 0; }
-        
-        .original-content { background: white; color: black; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; overflow: hidden; }
-        .toggle-link { text-align: right; font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; display: block; }
-        
-        .footer { text-align: center; font-size: 12px; color: #64748b; margin-top: 20px; border-top: 1px solid #334155; padding-top: 10px; }
-        .footer a { color: var(--accent); text-decoration: none; display: block; margin: 3px 0; }
+    <title>Hộp thư xác minh - {{ domain }}</title>
+    <meta http-equiv="refresh" content="5"> <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: #fff; text-align: center; padding: 50px; }
+        .code-card { background: #333; padding: 20px; border-radius: 10px; border: 2px solid #ff4655; display: inline-block; }
+        .code { font-size: 50px; color: #ff4655; font-weight: bold; letter-spacing: 5px; }
+        .email { color: #aaa; margin-bottom: 10px; }
     </style>
-    <script>
-        function copy(text) { navigator.clipboard.writeText(text); alert('Đã copy: ' + text); }
-        function toggle(id) {
-            var x = document.getElementById(id);
-            x.style.display = (x.style.display === 'block') ? 'none' : 'block';
-        }
-    </script>
 </head>
 <body>
-    <div class="container">
-        {{ content|safe }}
-        <div class="footer">
-            <p>HỖ TRỢ KỸ THUẬT</p>
-            <p>Zalo: 0326.265.982</p>
-            <a href="https://t.me/AnhNhat07">Telegram: @AnhNhat07</a>
-            <a href="https://fb.com/MYNAMEISNHAT07">Facebook: MYNAMEISNHAT07</a>
-        </div>
+    <h2>📬 Đang hóng code cho {{ domain }}</h2>
+    <div class="code-card">
+        {% if code %}
+            <div class="email">Mail nhận: {{ target }}</div>
+            <div class="code">{{ code }}</div>
+            <div style="margin-top:10px">Vừa nhận xong!</div>
+        {% else %}
+            <div class="code">⏳...</div>
+            <p>Đang đợi code từ Garena gửi tới...</p>
+        {% endif %}
     </div>
 </body>
 </html>
 """
 
-# ================= ROUTES =================
-@app.route('/', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = request.form['username'].strip().lower().split('@')[0]
-        session['user'] = user
-        return redirect(url_for('inbox'))
-    return render_template_string(HTML_LAYOUT, content="""
-        <h2>GARENA MAIL</h2>
-        <form method="post">
-            <input name="username" placeholder="Nhập tên tài khoản (ví dụ: nhattaoacc01)" required>
-            <button>XEM CODE NGAY</button>
-        </form>
-    """)
-
+@app.route('/')
 @app.route('/inbox')
 def inbox():
-    if 'user' not in session: return redirect(url_for('login'))
-    user = session['user']
-    target_email = f"{user}@{DOMAIN}"
+    latest_code = None
+    target_user = "Chưa có"
     
     try:
         with MailBox('imap.gmail.com').login(MY_GMAIL, MY_APP_PASS) as mailbox:
-            msgs = [m for m in mailbox.fetch(AND(to=target_email), limit=5, reverse=True)]
-            
-            if not msgs:
-                html = f"<div style='text-align:center; padding:20px'>📭 Chưa có thư nào cho <b>{target_email}</b></div>"
-            else:
-                html = ""
-                for i, msg in enumerate(msgs):
-                    # CHỈNH GIỜ VIỆT NAM (GMT+7)
-                    vn_time = msg.date.astimezone(timezone(timedelta(hours=7)))
-                    time_str = vn_time.strftime("%H:%M %d/%m")
-                    
-                    body_view = msg.html if msg.html else msg.text
-                    text_for_scan = msg.text if msg.text else msg.html
-                    
-                    # Gọi hàm lọc thông minh
-                    code = extract_garena_code(text_for_scan)
-                    
-                    code_html = f"""<div class="code-box"><span class="code-val">{code}</span><button class="copy-btn" onclick="copy('{code}')">COPY</button></div>""" if code else "<div style='color:#ef4444; font-size:12px'>⚠️ Không tìm thấy code</div>"
-                    
-                    html += f"""
-                    <div class="email-item">
-                        <div class="meta"><span>{time_str}</span><span>GARENA</span></div>
-                        <div class="subject">{msg.subject}</div>
-                        {code_html}
-                        <span class="toggle-link" onclick="toggle('body-{i}')">▼ Xem nội dung gốc</span>
-                        <div id="body-{i}" class="original-content">{body_view}</div>
-                    </div>
-                    """
-    except Exception as e:
-        html = f"<div style='color:red; text-align:center'>Lỗi kết nối: {e}</div>"
+            # Lấy mail mới nhất từ Garena
+            for msg in mailbox.fetch(limit=1, reverse=True):
+                target_user = msg.to[0]
+                match = re.search(r'\b\d{6}\b', msg.text or msg.html)
+                if match:
+                    latest_code = match.group(0)
+    except:
+        pass
 
-    return render_template_string(HTML_LAYOUT, content=f"""
-        <div style="text-align:center; margin-bottom:15px">
-            👤 <b>{user}</b> | <a href="/logout" style="color:#ef4444; text-decoration:none">Thoát</a>
-        </div>
-        <a href="/inbox" style="text-decoration:none"><button style="background:#10b981; margin-bottom:15px">🔄 LÀM MỚI</button></a>
-        {html}
-    """)
+    return render_template_string(HTML_TEMPLATE, 
+                                 code=latest_code, 
+                                 target=target_user, 
+                                 domain="anhnhat07.online")
 
-@app.route('/logout')
-def logout():
-    session.pop('user', None)
-    return redirect(url_for('login'))
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)

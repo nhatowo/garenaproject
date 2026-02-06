@@ -1,65 +1,50 @@
-# Đây là code dành cho trang WEB hiển thị mail code (Flask/FastAPI)
-# Đảm bảo bạn đã cài: pip install flask imap_tools
-
-from flask import Flask, render_template_string
-from imap_tools import MailBox, AND
+from flask import Flask, render_template, jsonify
+from imap_tools import MailBox
 import re
 
 app = Flask(__name__)
 
-# Cấu hình mail của Nhật
-MY_GMAIL = "anhnhatlamacc@gmail.com"
-MY_APP_PASS = "jdmx zyeb vhtr lqhn"
-
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Hộp thư xác minh - {{ domain }}</title>
-    <meta http-equiv="refresh" content="5"> <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: #fff; text-align: center; padding: 50px; }
-        .code-card { background: #333; padding: 20px; border-radius: 10px; border: 2px solid #ff4655; display: inline-block; }
-        .code { font-size: 50px; color: #ff4655; font-weight: bold; letter-spacing: 5px; }
-        .email { color: #aaa; margin-bottom: 10px; }
-    </style>
-</head>
-<body>
-    <h2>📬 Đang hóng code cho {{ domain }}</h2>
-    <div class="code-card">
-        {% if code %}
-            <div class="email">Mail nhận: {{ target }}</div>
-            <div class="code">{{ code }}</div>
-            <div style="margin-top:10px">Vừa nhận xong!</div>
-        {% else %}
-            <div class="code">⏳...</div>
-            <p>Đang đợi code từ Garena gửi tới...</p>
-        {% endif %}
-    </div>
-</body>
-</html>
-"""
+# --- CẤU HÌNH EMAIL CỦA NHẬT (CHUẨN SUBDOMAIN) ---
+IMAP_SERVER = 'mail.anhnhat07.online'  # Đã đổi theo ý Nhật
+EMAIL_USER = 'admin@anhnhat07.online'  # Hoặc user nào Nhật dùng để nhận code
+EMAIL_PASS = 'Mat_Khau_Email_Cua_Nhat' # Nhớ điền pass chuẩn nhé
 
 @app.route('/')
-@app.route('/inbox')
-def inbox():
-    latest_code = None
-    target_user = "Chưa có"
-    
+def index():
+    return render_template('index.html')
+
+@app.route('/api/get_mails')
+def get_mails():
     try:
-        with MailBox('imap.gmail.com').login(MY_GMAIL, MY_APP_PASS) as mailbox:
-            # Lấy mail mới nhất từ Garena
-            for msg in mailbox.fetch(limit=1, reverse=True):
-                target_user = msg.to[0]
-                match = re.search(r'\b\d{6}\b', msg.text or msg.html)
-                if match:
-                    latest_code = match.group(0)
-    except:
-        pass
+        # Kết nối vào hòm thư
+        with MailBox(IMAP_SERVER).login(EMAIL_USER, EMAIL_PASS) as mailbox:
+            mails = []
+            # Lấy 10 mail mới nhất (để tốc độ load siêu nhanh)
+            for msg in mailbox.fetch(limit=10, reverse=True):
+                is_garena = False
+                verification_code = "---"
+                
+                # Logic bắt code Garena
+                if "Garena" in msg.subject or "Garena" in msg.text:
+                    is_garena = True
+                    # Tìm chuỗi 6 số (Ví dụ: 123456)
+                    match = re.search(r'\b\d{6}\b', msg.text)
+                    if match:
+                        verification_code = match.group(0)
 
-    return render_template_string(HTML_TEMPLATE, 
-                                 code=latest_code, 
-                                 target=target_user, 
-                                 domain="anhnhat07.online")
+                mails.append({
+                    "subject": msg.subject,
+                    "from": msg.from_,
+                    "date": msg.date_str,
+                    "body": msg.text[:80] + "...", 
+                    "is_garena": is_garena,
+                    "code": verification_code
+                })
+            return jsonify({"status": "success", "data": mails})
+    except Exception as e:
+        print(f"Lỗi IMAP: {e}") # In lỗi ra terminal để Nhật dễ debug
+        return jsonify({"status": "error", "message": str(e)})
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+if __name__ == '__main__':
+    # Chạy ở port 5000
+    app.run(debug=True, port=5000)

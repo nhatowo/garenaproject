@@ -48,3 +48,11 @@ def get_mails():
 if __name__ == '__main__':
     # Chạy ở port 5000
     app.run(debug=True, port=5000)
+# ... (Phần code trên giữ nguyên) ...
+
+if __name__ == '__main__':
+    # Chạy dưới dạng module (cho máy tính cá nhân)
+    app.run(debug=True)
+    
+# Render sẽ không chạy vào dòng if __main__ này, nó sẽ import app trực tiếp
+

@@ -4,13 +4,12 @@ import re
 
 app = Flask(__name__)
 
-# --- CẤU HÌNH EMAIL (QUAN TRỌNG) ---
-# Vì mail gốc là Gmail, nên bắt buộc dùng server này:
+# --- CẤU HÌNH EMAIL ---
 IMAP_SERVER = 'imap.gmail.com'
 EMAIL_USER = 'anhnhatlamacc@gmail.com'
-EMAIL_PASS = 'hpfyywdpistzzoec' # Mật khẩu ứng dụng cũ của bạn
+EMAIL_PASS = 'hpfyywdpistzzoec' 
 
-# --- GIAO DIỆN WEB (ĐỂ XEM TRÊN ĐIỆN THOẠI) ---
+# --- GIAO DIỆN WEB ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -20,16 +19,17 @@ HTML_TEMPLATE = """
     <title>Tool Lấy Code Garena</title>
     <meta http-equiv="refresh" content="5">
     <style>
-        body { background-color: #000; color: #0f0; font-family: monospace; padding: 15px; }
-        .box { border: 1px solid #333; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
-        .code { font-size: 32px; color: #ff0000; font-weight: bold; letter-spacing: 3px; }
-        .time { font-size: 10px; color: #666; }
-        h2 { text-align: center; border-bottom: 2px solid #0f0; padding-bottom: 10px; }
+        body { background-color: #121212; color: #00ff00; font-family: monospace; padding: 10px; }
+        .box { border: 1px solid #333; background: #1e1e1e; padding: 15px; margin-bottom: 10px; border-radius: 8px; }
+        .code { font-size: 40px; color: #ff4444; font-weight: bold; letter-spacing: 3px; margin: 10px 0; display:block; }
+        .time { font-size: 11px; color: #888; margin-bottom: 5px; }
+        .subject { font-weight: bold; color: #fff; font-size: 14px; }
+        .no-code { color: #555; font-size: 12px; font-style: italic; }
     </style>
 </head>
 <body>
-    <h2>TRẠM THU PHÁT SÓNG</h2>
-    <div id="list">Đang tải dữ liệu...</div>
+    <h3 style="text-align:center; border-bottom: 1px solid #333; padding-bottom:10px">MAILBOX GARENA (6-8 SỐ)</h3>
+    <div id="list">Đang tải...</div>
     
     <script>
         fetch('/api/get_mails')
@@ -38,10 +38,14 @@ HTML_TEMPLATE = """
                 if(data.status == 'success') {
                     let html = '';
                     data.data.forEach(m => {
-                        html += `<div class="box">
+                        let codeHtml = (m.code != "---") 
+                            ? `<span class="code">${m.code}</span>` 
+                            : `<span class="no-code">Không tìm thấy mã</span>`;
+                            
+                        html += `<div class="box" style="${m.code != '---' ? 'border: 1px solid #00ff00' : ''}">
                             <div class="time">${m.date}</div>
-                            <div>${m.subject}</div>
-                            ${m.is_garena && m.code != "---" ? '<div class="code">' + m.code + '</div>' : ''}
+                            <div class="subject">${m.subject}</div>
+                            ${codeHtml}
                         </div>`;
                     });
                     document.getElementById('list').innerHTML = html;
@@ -49,7 +53,7 @@ HTML_TEMPLATE = """
                     document.getElementById('list').innerHTML = "Lỗi: " + data.message;
                 }
             })
-            .catch(e => document.getElementById('list').innerText = "Lỗi mạng!");
+            .catch(e => document.getElementById('list').innerText = "Lỗi mạng...");
     </script>
 </body>
 </html>
@@ -62,31 +66,33 @@ def index():
 @app.route('/api/get_mails')
 def get_mails():
     try:
-        # Kết nối vào Gmail
         with MailBox(IMAP_SERVER).login(EMAIL_USER, EMAIL_PASS) as mailbox:
             mails = []
-            # Lấy 10 mail mới nhất
-            for msg in mailbox.fetch(limit=10, reverse=True):
-                is_garena = False
+            # Lấy 20 mail mới nhất
+            for msg in mailbox.fetch(limit=20, reverse=True):
                 verification_code = "---"
                 
-                # Logic tìm code Garena
-                if "Garena" in msg.subject or "Garena" in msg.text:
-                    is_garena = True
-                    match = re.search(r'\\b\\d{6}\\b', msg.text)
-                    if match:
-                        verification_code = match.group(0)
+                # Chỉ xử lý mail có chữ Garena hoặc Code/Mã xác minh
+                # (Để tránh bắt nhầm mail rác)
+                full_text = (msg.subject + " " + msg.text).strip()
+                
+                # Regex mới: \b\d{6,8}\b 
+                # Nghĩa là: Tìm chuỗi số liên tiếp dài từ 6 đến 8 ký tự
+                # \b là để đảm bảo nó đứng riêng (không dính vào chữ khác)
+                match = re.search(r'\b\d{6,8}\b', full_text)
+                if match:
+                    verification_code = match.group(0)
 
-                mails.append({
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "is_garena": is_garena,
-                    "code": verification_code
-                })
+                # Chỉ lấy mail có Code hoặc có chữ Garena
+                if verification_code != "---" or "Garena" in msg.subject:
+                    mails.append({
+                        "subject": msg.subject,
+                        "date": msg.date_str,
+                        "code": verification_code
+                    })
             return jsonify({"status": "success", "data": mails})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)
-

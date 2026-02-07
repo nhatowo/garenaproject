@@ -8,7 +8,7 @@ app = Flask(__name__)
 # Vì mail gốc là Gmail, nên bắt buộc dùng server này:
 IMAP_SERVER = 'imap.gmail.com'
 EMAIL_USER = 'anhnhatlamacc@gmail.com'
-EMAIL_PASS = 'hpfy ywdp istz zoec' # Mật khẩu ứng dụng cũ của bạn
+EMAIL_PASS = 'hpfyywdpistzzoec' # Mật khẩu ứng dụng cũ của bạn
 
 # --- GIAO DIỆN WEB (ĐỂ XEM TRÊN ĐIỆN THOẠI) ---
 HTML_TEMPLATE = """
@@ -89,3 +89,4 @@ def get_mails():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
